@@ -2,14 +2,12 @@ FROM golang:alpine AS builder
 RUN apk update && apk add --no-cache git bash curl
 WORKDIR /go/src/v2ray.com/core
 RUN git clone --progress https://github.com/v2fly/v2ray-core.git . && \
-    bash ./release/user-package.sh nosource noconf codename=$(git describe --tags) buildname=docker-fly abpathtgz=/tmp/v2ray.tgz
+    go mod download && \
+    CGO_ENABLED=0 go build -o /tmp/v2ray -trimpath -ldflags "-s -w -buildid=" ./main
 
 FROM alpine
-ENV CONFIG=https://raw.githubusercontent.com/nanosoc/kinto/master/config.json
-COPY --from=builder /tmp/v2ray.tgz /tmp
-RUN apk update && apk add --no-cache tor ca-certificates && \
-    tar xvfz /tmp/v2ray.tgz -C /usr/bin && \
-    rm -rf /tmp/v2ray.tgz
-    
-CMD nohup tor & \
-    v2ray -config $CONFIG
+COPY --from=builder /tmp/v2ray /usr/bin
+
+ADD v2ray.sh /v2ray.sh
+RUN chmod +x /v2ray.sh
+CMD /v2ray.sh
